@@ -8,7 +8,7 @@ All extraction, OCR, validation and storage run locally. No account, hosted serv
 
 ## Install on a Mac
 
-**[Download the latest Mac installer](https://github.com/ella-zanette/fieldwork/releases/latest)** · [Browse the source](https://github.com/ella-zanette/fieldwork)
+**[Download the latest Mac installer](https://github.com/Giovanni-Zanette/fieldwork/releases/latest)** · [Browse the source](https://github.com/Giovanni-Zanette/fieldwork)
 
 Choose the `.dmg` from the release assets. The source ZIP is for developers; it is not the installer. Each release includes checksums and a quick-start guide.
 
@@ -76,7 +76,7 @@ Every core workflow is available through the authenticated local [JSON API](API.
 These requirements apply to developers, not people installing the DMG. Source startup needs Python 3.12+ and a first-time internet connection to install pinned dependencies. The production Mac build uses managed Python 3.12.13 plus Xcode command-line tools and `uv`.
 
 ```sh
-git clone https://github.com/ella-zanette/fieldwork.git
+git clone https://github.com/Giovanni-Zanette/fieldwork.git
 cd fieldwork
 FIELDWORK_DATA_DIR="$PWD/work/development" FIELDWORK_PORT=4341 ./run.sh
 ```
