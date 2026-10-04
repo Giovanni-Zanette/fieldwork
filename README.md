@@ -8,9 +8,11 @@ All extraction, OCR, validation and storage run locally. No account, hosted serv
 
 The v1 build supports **Apple Silicon Macs running macOS 13 or later**. Intel Macs, Windows and iOS are not included.
 
-1. Open `Fieldwork-1.0.0-mac-arm64.dmg` and drag Fieldwork to Applications.
+1. Open `Fieldwork-1.0.1-mac-arm64.dmg` and drag Fieldwork to Applications.
 2. Open Fieldwork from Applications. You do not need Python, Node, pip or a terminal.
 3. Choose **Import documents** to use your files, or try the optional example.
+
+To update an existing installation, quit Fieldwork, replace only the app in Applications, then reopen it. Documents, templates and settings remain in the separate Application Support workspace. Version 1.0.1 fixes the file-picker import race that could incorrectly reject a selected PDF/image after the picker reset; it does not change the database format.
 
 This initial distribution is ad-hoc signed and not notarized. If macOS blocks it, verify that the file came from the intended source and that its SHA256 matches the supplied checksum. Use macOS's per-app **Privacy & Security → Open Anyway** option if available and you trust that build. Do not disable Gatekeeper globally. Local acceptance on the build Mac does not establish downloaded-app acceptance on every Mac.
 
@@ -62,11 +64,12 @@ Open `http://localhost:4341`. For source development only, use the generated `wo
 
 ```sh
 .venv/bin/python -m unittest discover -s tests
+node --test tests/import-files.test.mjs
 ./scripts/package-mac.sh --app-only
 .packaging-venv/bin/python tests/acceptance_product.py
 ./scripts/package-mac.sh
 ```
 
-The release script writes the app, DMG, SHA256 and binary compatibility audit under ignored `release/`. See [Mac build details](desktop/BUILD.md) and [packaged acceptance](tests/ACCEPTANCE.md). Tests use only synthetic documents and isolated profiles, never the real application workspace. Freshly generated acceptance reports and test profiles stay out of source control.
+The frontend regression command requires Node 20 or later on the developer machine; Node is not an application runtime dependency. The release script writes the app, DMG, SHA256 and binary compatibility audit under ignored `release/`. See [Mac build details](desktop/BUILD.md) and [packaged acceptance](tests/ACCEPTANCE.md). Tests use only synthetic documents and isolated profiles, never the real application workspace. Freshly generated acceptance reports and test profiles stay out of source control.
 
 The application uses Flask, SQLite, pdfplumber/PDFium, Pillow and openpyxl with pinned dependencies in `requirements.lock.txt`; the native shell uses Cocoa/WebKit and Vision. App source is [MIT licensed](LICENSE). Bundles include the upstream runtime/dependency notices and version inventory under `Fieldwork.app/Contents/Resources/licenses`.

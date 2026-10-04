@@ -53,6 +53,16 @@ class APITests(unittest.TestCase):
         id=self.post('/api/samples',{'name':'purchase-order.pdf'}).get_json()['id']
         self.assertTrue(self.get_document(id)['pages'][0]['lines'])
 
+    def test_multipart_pdf_and_image_upload(self):
+        from PIL import Image
+        image=io.BytesIO();Image.new('RGB',(40,40),'white').save(image,format='PNG');image.seek(0)
+        pdf=(Path(__file__).resolve().parents[1]/'samples/purchase-order.pdf').read_bytes()
+        response=self.client.post('/api/upload',data={'files':[(io.BytesIO(pdf),'Purchase order.PDF','application/pdf'),(image,'scan.png','image/png')]},headers=self.auth,**self.base)
+        self.assertEqual(response.status_code,200)
+        docs=[self.get_document(id) for id in response.get_json()['ids']]
+        self.assertEqual([d['name'] for d in docs],['Purchase order.PDF','scan.png'])
+        self.assertTrue(all(d['pages'] and d['status']=='imported' for d in docs))
+
     def test_edit_revokes_approval_and_stale_revision_rejected(self):
         id,_=self.prepared();doc=self.get_document(id)
         self.assertEqual(self.post('/api/documents/'+id+'/approve',{'revision':doc['reviewRevision']}).status_code,200)

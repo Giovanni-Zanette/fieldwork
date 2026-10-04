@@ -3,7 +3,7 @@ from pathlib import Path
 import argparse, hashlib, importlib.metadata, json, os, plistlib, re, shutil, subprocess, sys
 
 ROOT=Path(__file__).resolve().parents[1]
-VERSION='1.0.0'
+VERSION='1.0.1'
 BUILD=ROOT/'build'/'desktop'
 RELEASE=ROOT/'release'
 APP=RELEASE/'Fieldwork.app'
@@ -80,7 +80,7 @@ def main():
     shutil.copy2(BUILD/'Fieldwork',macos/'Fieldwork');shutil.copy2(BUILD/'fieldwork-ocr',resources/'fieldwork-ocr')
     shutil.copytree(BUILD/'dist'/'fieldwork-server',resources/'backend',symlinks=True)
     copy_license_files(resources/'licenses');make_icon(resources)
-    info={'CFBundleName':'Fieldwork','CFBundleDisplayName':'Fieldwork','CFBundleIdentifier':'ai.zanette.fieldwork','CFBundleExecutable':'Fieldwork','CFBundlePackageType':'APPL','CFBundleShortVersionString':VERSION,'CFBundleVersion':'1','LSMinimumSystemVersion':'13.0','NSHighResolutionCapable':True,'CFBundleIconFile':'Fieldwork.icns','NSHumanReadableCopyright':'Copyright © 2026 Giovanni Zanette. MIT license.','NSAppTransportSecurity':{'NSAllowsLocalNetworking':True},'LSApplicationCategoryType':'public.app-category.productivity'}
+    info={'CFBundleName':'Fieldwork','CFBundleDisplayName':'Fieldwork','CFBundleIdentifier':'ai.zanette.fieldwork','CFBundleExecutable':'Fieldwork','CFBundlePackageType':'APPL','CFBundleShortVersionString':VERSION,'CFBundleVersion':'2','LSMinimumSystemVersion':'13.0','NSHighResolutionCapable':True,'CFBundleIconFile':'Fieldwork.icns','NSHumanReadableCopyright':'Copyright © 2026 Giovanni Zanette. MIT license.','NSAppTransportSecurity':{'NSAllowsLocalNetworking':True},'LSApplicationCategoryType':'public.app-category.productivity'}
     with (APP/'Contents'/'Info.plist').open('wb') as out:plistlib.dump(info,out)
     audit=binary_audit(APP)
     (RELEASE/f'Fieldwork-{VERSION}-binary-audit.json').write_text(json.dumps(audit,indent=2)+'\n')
@@ -88,7 +88,7 @@ def main():
     run('codesign','--verify','--deep','--strict','--verbose=2',APP)
     if not args.app_only:
         stage=BUILD/'dmg';shutil.rmtree(stage,ignore_errors=True);stage.mkdir();shutil.copytree(APP,stage/'Fieldwork.app',symlinks=True);(stage/'Applications').symlink_to('/Applications')
-        (stage/'READ ME.txt').write_text('Fieldwork 1.0.0 — Apple Silicon Mac, macOS13 or later.\nDrag Fieldwork to Applications, then open it. All processing and OCR run on this Mac; no Python, Node or paid service is required.\nThis build is ad-hoc signed, not Apple-notarized. A downloaded copy may need macOS Privacy & Security approval. Do not disable Gatekeeper globally.\nWatch folders process while the app runs; Quit stops them. Documents and templates live in Application Support/Fieldwork, outside the app.\n')
+        (stage/'READ ME.txt').write_text(f'Fieldwork {VERSION} — Apple Silicon Mac, macOS13 or later.\nIf upgrading, quit Fieldwork with Cmd-Q before replacing the app. Drag Fieldwork to Applications, then open it. Your existing workspace remains in Application Support/Fieldwork and is not removed by replacing the app. All processing and OCR run on this Mac; no Python, Node or paid service is required.\nThis build is ad-hoc signed, not Apple-notarized. A downloaded copy may need macOS Privacy & Security approval. Do not disable Gatekeeper globally.\nWatch folders process while the app runs; Quit stops them. Documents and templates live in Application Support/Fieldwork, outside the app.\n')
         dmg=RELEASE/f'Fieldwork-{VERSION}-mac-arm64.dmg';dmg.unlink(missing_ok=True)
         run('hdiutil','create','-volname','Fieldwork','-srcfolder',stage,'-ov','-format','UDZO',dmg)
         digest=hashlib.sha256(dmg.read_bytes()).hexdigest();(RELEASE/f'Fieldwork-{VERSION}-SHA256.txt').write_text(f'{digest}  {dmg.name}\n')
