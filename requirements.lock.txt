@@ -1,0 +1,17 @@
+blinker==1.9.0
+cffi==2.1.1
+charset-normalizer==3.5.2
+click==8.5.0
+cryptography==50.0.2
+et_xmlfile==2.0.0
+Flask==3.1.2
+itsdangerous==2.2.0
+Jinja2==3.1.6
+MarkupSafe==3.0.4
+openpyxl==3.1.5
+pdfminer.six==20250506
+pdfplumber==0.11.7
+pillow==12.3.0
+pycparser==3.0
+pypdfium2==5.13.0
+Werkzeug==3.1.9
