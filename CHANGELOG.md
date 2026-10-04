@@ -1,5 +1,9 @@
 # Changes
 
+## Unreleased
+
+Approval guidance now distinguishes results that cannot be approved from review issues that permit an explicit exception. Empty extractions and unresolved duplicates no longer offer a misleading reason override. Conflicts refresh the document without automatically reopening the approval dialog. The backend's approval and export safeguards are unchanged; the published 1.0.2 installer is unchanged.
+
 ## 1.0.2
 
 Added an opt-in Invoice starter with invoice-specific labels, whole-label inline anchors, inferred table columns and wrapped-description handling. Unambiguous numeric dates normalize to ISO; ambiguous dates require a configured order or review. Missing tax and invoice total remain blank, and Balance due stays a separate field. VAT registration labels and item descriptions containing “Total” are excluded from financial-summary matching. Existing templates keep their previous matching and geometry.

@@ -91,6 +91,43 @@ class APITests(unittest.TestCase):
             self.assertEqual(response.status_code,200)
         self.assertEqual(len(self.get_document(id)['result']['items']),1)
 
+    def test_empty_extraction_never_accepts_an_override_reason(self):
+        id,_=self.prepared();original=self.get_document(id)['result']
+        cases=[
+            ({name:'   ' for name in original['fields']},original['items']),
+            (original['fields'],[]),
+        ]
+        for fields,items in cases:
+            with self.subTest(headers_present=any(v.strip() for v in fields.values()),rows=len(items)):
+                doc=self.get_document(id)
+                saved=self.post('/api/documents/'+id+'/review',{'fields':fields,'items':items,'revision':doc['reviewRevision']})
+                self.assertEqual(saved.status_code,200)
+                before=self.get_document(id)
+                response=self.post('/api/documents/'+id+'/approve',{'revision':before['reviewRevision'],'override':True,'note':'A written reason cannot bypass missing extracted data.'})
+                self.assertEqual(response.status_code,400)
+                self.assertIn('Empty extraction cannot be approved',response.get_json()['error'])
+                after=self.get_document(id)
+                self.assertEqual(after['status'],'needs_review')
+                self.assertEqual(after['reviewRevision'],before['reviewRevision'])
+                self.assertIsNone(after['approvalNote'])
+                self.assertEqual(self.post('/api/export',{'format':'json','documentIds':[id]}).status_code,400)
+        audit=self.client.get('/api/documents/'+id+'/audit',headers=self.auth,**self.base).get_json()
+        self.assertFalse(any(event['action']=='approved' for event in audit['events']))
+
+    def test_header_only_template_does_not_require_table_rows(self):
+        template=copy.deepcopy(server.DEFAULT_TEMPLATE)
+        template['name']='Header-only document';template['table']['enabled']=False;template['validation']['enabled']=False
+        template_id=self.post('/api/templates',{'template':template}).get_json()['id']
+        id=self.post('/api/samples',{'name':'purchase-order.pdf'}).get_json()['id']
+        self.post('/api/jobs',{'templateId':template_id,'documentIds':[id]});server.service.start()
+        for _ in range(100):
+            doc=self.get_document(id)
+            if doc['status'] in {'validated','needs_review','failed'}:break
+            time.sleep(.02)
+        self.assertEqual(doc['status'],'validated')
+        self.assertEqual(doc['result']['items'],[])
+        self.assertEqual(self.post('/api/documents/'+id+'/approve',{'revision':doc['reviewRevision']}).status_code,200)
+
     def test_archive_restore_and_no_original_deletion(self):
         id,_=self.prepared();original=server.service.source(server.service.document(id));content=original.read_bytes()
         self.post('/api/documents/'+id+'/archive',{'archived':True})
@@ -106,7 +143,12 @@ class APITests(unittest.TestCase):
             time.sleep(.02)
         doc=self.get_document(id)
         self.assertEqual(self.post('/api/documents/'+id+'/approve',{'revision':doc['reviewRevision']}).status_code,409)
+        self.assertEqual(self.post('/api/documents/'+id+'/approve',{'revision':doc['reviewRevision'],'override':True,'note':'This must not bypass the explicit duplicate decision.'}).status_code,409)
+        self.assertNotIn(self.get_document(id)['status'],{'approved','approved_with_exceptions'})
         self.post('/api/documents/'+other+'/duplicate',{'decision':'ignore','note':'Duplicate source'})
+        ignored=self.get_document(other)
+        self.assertEqual(self.post('/api/documents/'+other+'/approve',{'revision':ignored['reviewRevision'],'override':True,'note':'This must not turn an ignored duplicate into an export.'}).status_code,400)
+        self.assertEqual(self.get_document(other)['status'],'ignored')
         doc=self.get_document(id)
         self.assertEqual(self.post('/api/documents/'+id+'/approve',{'revision':doc['reviewRevision']}).status_code,200)
         self.assertEqual(self.post('/api/export',{'format':'csv','documentIds':[other]}).status_code,400)
