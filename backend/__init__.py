@@ -1,0 +1,1 @@
+"""Fieldwork local application core."""

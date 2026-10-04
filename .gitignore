@@ -1,4 +1,8 @@
 .venv/
+.packaging-venv/
+desktop/Fieldwork
+desktop/fieldwork-ocr
+desktop/*.icns
 __pycache__/
 *.pyc
 .DS_Store
