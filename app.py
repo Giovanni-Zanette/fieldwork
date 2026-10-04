@@ -21,7 +21,7 @@ from backend.storage import Store
 from backend.service import Service, EXTENSIONS
 from backend.engine import DEFAULT_TEMPLATE, INVOICE_TEMPLATE, validate_result, validate_export_columns, render_original
 
-VERSION='1.0.2'
+VERSION='1.0.3'
 BASE=Path(getattr(sys,'_MEIPASS',Path(__file__).resolve().parent))
 PORT=int(os.environ.get('FIELDWORK_PORT','4341'))
 DATA=Path(os.environ.get('FIELDWORK_DATA_DIR',str(Path.home()/'Library/Application Support/Fieldwork'))).expanduser().resolve()

@@ -3,7 +3,7 @@ from pathlib import Path
 import argparse, hashlib, importlib.metadata, json, os, plistlib, re, shutil, subprocess, sys
 
 ROOT=Path(__file__).resolve().parents[1]
-VERSION='1.0.2'
+VERSION='1.0.3'
 BUILD=ROOT/'build'/'desktop'
 RELEASE=ROOT/'release'
 APP=RELEASE/'Fieldwork.app'
@@ -80,7 +80,7 @@ def main():
     shutil.copy2(BUILD/'Fieldwork',macos/'Fieldwork');shutil.copy2(BUILD/'fieldwork-ocr',resources/'fieldwork-ocr')
     shutil.copytree(BUILD/'dist'/'fieldwork-server',resources/'backend',symlinks=True)
     copy_license_files(resources/'licenses');make_icon(resources)
-    info={'CFBundleName':'Fieldwork','CFBundleDisplayName':'Fieldwork','CFBundleIdentifier':'ai.zanette.fieldwork','CFBundleExecutable':'Fieldwork','CFBundlePackageType':'APPL','CFBundleShortVersionString':VERSION,'CFBundleVersion':'3','LSMinimumSystemVersion':'13.0','NSHighResolutionCapable':True,'CFBundleIconFile':'Fieldwork.icns','NSHumanReadableCopyright':'Copyright © 2026 Giovanni Zanette. MIT license.','NSAppTransportSecurity':{'NSAllowsLocalNetworking':True},'LSApplicationCategoryType':'public.app-category.productivity'}
+    info={'CFBundleName':'Fieldwork','CFBundleDisplayName':'Fieldwork','CFBundleIdentifier':'ai.zanette.fieldwork','CFBundleExecutable':'Fieldwork','CFBundlePackageType':'APPL','CFBundleShortVersionString':VERSION,'CFBundleVersion':'4','LSMinimumSystemVersion':'13.0','NSHighResolutionCapable':True,'CFBundleIconFile':'Fieldwork.icns','NSHumanReadableCopyright':'Copyright © 2026 Giovanni Zanette. MIT license.','NSAppTransportSecurity':{'NSAllowsLocalNetworking':True},'LSApplicationCategoryType':'public.app-category.productivity'}
     with (APP/'Contents'/'Info.plist').open('wb') as out:plistlib.dump(info,out)
     audit=binary_audit(APP)
     (RELEASE/f'Fieldwork-{VERSION}-binary-audit.json').write_text(json.dumps(audit,indent=2)+'\n')

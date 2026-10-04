@@ -1,18 +1,24 @@
 # Fieldwork
 
+Created by **Giovanni Zanette · Zanette.ai**. Free, local document processing for Mac.
+
 Fieldwork turns recurring PDFs and scanned documents into reviewed spreadsheet data on your Mac. Teach a template from a representative document, reuse it for a batch, check the source alongside the extracted values, then export approved records.
 
 All extraction, OCR, validation and storage run locally. No account, hosted server, paid API, subscription or downloaded AI model is required. The Mac app bundles its Python processing engine and uses Apple's on-device Vision OCR. The included example is fictional and optional; a new workspace starts empty.
 
 ## Install on a Mac
 
+**[Download the latest Mac installer](https://github.com/ella-zanette/fieldwork/releases/latest)** · [Browse the source](https://github.com/ella-zanette/fieldwork)
+
+Choose the `.dmg` from the release assets. The source ZIP is for developers; it is not the installer. Each release includes checksums and a quick-start guide.
+
 The v1 build supports **Apple Silicon Macs running macOS 13 or later**. Intel Macs, Windows and iOS are not included.
 
-1. Open `Fieldwork-1.0.2-mac-arm64.dmg` and drag the Fieldwork icon along the arrow to Applications.
+1. Open `Fieldwork-1.0.3-mac-arm64.dmg` and drag the Fieldwork icon along the arrow to Applications.
 2. Open Fieldwork from Applications. You do not need Python, Node, pip or a terminal.
 3. Choose **Import documents** to use your files, or try the optional example.
 
-To update an existing installation, quit Fieldwork, replace only the app in Applications, then reopen it. Documents, templates and settings remain in the separate Application Support workspace. Version 1.0.2 adds an Invoice starter and a clearer installer; it does not change the database format or alter existing templates automatically.
+To update an existing installation, quit Fieldwork, replace only the app in Applications, then reopen it. Documents, templates and settings remain in the separate Application Support workspace. Version 1.0.3 includes the Invoice starter, a clearer installer and approval guidance that distinguishes missing data from reviewable exceptions. It does not change the database format or alter existing templates automatically.
 
 This initial distribution is ad-hoc signed and not notarized. If macOS blocks it, verify that the file came from the intended source and that its SHA256 matches the supplied checksum. Use macOS's per-app **Privacy & Security → Open Anyway** option if available and you trust that build. Do not disable Gatekeeper globally. Local acceptance on the build Mac does not establish downloaded-app acceptance on every Mac.
 
@@ -24,7 +30,7 @@ This initial distribution is ad-hoc signed and not notarized. If macOS blocks it
 4. Enable financial validation when useful. It checks quantity × unit price, the sum of line amounts against subtotal, and subtotal + tax against total using exact decimal arithmetic. Disable it for forms, price lists and other nonfinancial documents.
 5. **Review:** compare values with highlighted source evidence. Correct fields or cells, add missing rows or remove spurious rows, then save and recheck. The original file and raw extraction remain preserved. Editing or reprocessing revokes approval. Template updates create a new version; previous documents retain their extraction's template snapshot.
 6. Resolve duplicate warnings explicitly with **Keep both** or **Ignore**. Keep both covers the current conflict set only. A later new copy requires another review. Ignoring a document excludes it from export and keeps its original available.
-7. **Approve** only after reviewing the result. Unresolved warnings require a written exception reason; these records are labelled **Approved with exceptions**, never mathematically validated. Every OCR result requires review. Empty extractions cannot be approved.
+7. **Approve** only after reviewing the result. Reviewable warnings require a written exception reason; these records are labelled **Approved with exceptions**, never mathematically validated. Every OCR result requires review. Missing extraction data or required table rows must be fixed first; an explanation cannot bypass those blockers. Resolve duplicates before approving.
 8. **Export:** CSV and Excel support chosen columns and headings; API callers can also set column order. JSON preserves the structured fields, rows, approval label, issues and review note. Only approved, nonarchived, nonignored documents export. If a new duplicate or issue invalidates an earlier approval, the entire export is stopped with named documents to review; nothing is silently omitted.
 
 Search and filter the document library, or archive documents without deleting their originals. Templates can be exported/imported as portable JSON. The activity log retains extraction, edit, approval and duplicate decisions.
@@ -61,7 +67,7 @@ Every core workflow is available through the authenticated local [JSON API](API.
 These requirements apply to developers, not people installing the DMG. Source startup needs Python 3.12+ and a first-time internet connection to install pinned dependencies. The production Mac build uses managed Python 3.12.13 plus Xcode command-line tools and `uv`.
 
 ```sh
-git clone git@github.com:ella-zanette/fieldwork.git
+git clone https://github.com/ella-zanette/fieldwork.git
 cd fieldwork
 FIELDWORK_DATA_DIR="$PWD/work/development" FIELDWORK_PORT=4341 ./run.sh
 ```

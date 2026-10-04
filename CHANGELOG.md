@@ -1,8 +1,8 @@
 # Changes
 
-## Unreleased
+## 1.0.3
 
-Approval guidance now distinguishes results that cannot be approved from review issues that permit an explicit exception. Empty extractions and unresolved duplicates no longer offer a misleading reason override. Conflicts refresh the document without automatically reopening the approval dialog. The backend's approval and export safeguards are unchanged; the published 1.0.2 installer is unchanged.
+Approval guidance now distinguishes results that cannot be approved from review issues that permit an explicit exception. Empty extractions and unresolved duplicates no longer offer a misleading reason override. Conflicts refresh the document without automatically reopening the approval dialog. The backend's approval and export safeguards are unchanged. Added a small Created by Zanette.ai credit. This is the first public GitHub release; existing workspaces are preserved.
 
 ## 1.0.2
 

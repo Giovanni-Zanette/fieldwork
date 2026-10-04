@@ -13,3 +13,6 @@
 
 /* Keep starter processing simple; layout rules remain available when needed. */
 .preset-intro{margin:16px 0;padding:13px 14px;background:var(--green-soft);border-radius:7px;font-size:12px}.preset-intro p{font-size:11px;margin:6px 0 0}.template-advanced{margin:16px 0}.template-advanced>summary{font-size:12px;font-weight:600;cursor:pointer;padding:10px 0;color:var(--green-dark)}.template-advanced>summary:focus-visible{outline:3px solid var(--focus);outline-offset:3px}.date-correction{color:var(--warning)}
+
+/* Creator credit stays secondary to the product name. */
+.brand-wordmark{display:grid;gap:2px;line-height:1.1;white-space:nowrap}.brand-wordmark small{font-size:10px;line-height:1.2;color:var(--muted);font-weight:400;letter-spacing:0}
