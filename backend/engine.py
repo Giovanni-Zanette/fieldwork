@@ -9,6 +9,7 @@ import subprocess
 import time
 import pdfplumber
 from PIL import Image, ImageSequence, ImageOps
+from .presets import INVOICE_TEMPLATE, normalize_date, AmbiguousDate
 
 TYPES = {'text', 'number', 'currency', 'date', 'email'}
 IDENTIFIER = re.compile(r'^[a-z][a-z0-9_]{0,49}$')
@@ -39,11 +40,18 @@ def validate_template(template):
                 raise ValueError('Invalid field label or required marker')
             if not table and (not isinstance(f.get('anchor'), str) or not 1 <= len(f['anchor'].strip()) <= 150 or f.get('position','after') not in {'after','below'}):
                 raise ValueError('Each header needs a literal anchor and after/below position')
+            aliases=f.get('aliases',[])
+            if not isinstance(aliases,list) or len(aliases)>15 or any(not isinstance(a,str) or not 1<=len(a.strip())<=150 for a in aliases):raise ValueError('Use up to 15 nonempty label aliases')
+            if f.get('match_mode','line_start') not in {'line_start','inline'}:raise ValueError('Unsupported label matching mode')
+            if f.get('date_format','iso') not in {'iso','auto','dmy','mdy'}:raise ValueError('Unsupported date format')
+            if f.get('two_digit_year_century') not in {None,1900,2000}:raise ValueError('Two-digit years require a configured century')
+            if not isinstance(f.get('fallback_below',False),bool):raise ValueError('Invalid below-label fallback')
         return names
     field_names = definitions(fields)
     table = template.get('table', {'enabled':False,'columns':[]})
     template['table'] = table
     column_names = set()
+    if table.get('mode','fixed') not in {'fixed','header'}:raise ValueError('Unsupported table layout mode')
     if table.get('enabled'):
         columns = table.get('columns')
         if not isinstance(columns, list) or not 1 <= len(columns) <= 20:
@@ -198,17 +206,175 @@ def read_pages(path,render_dir,ocr_binary=None,progress=lambda value:None,cancel
     finally:
         if pdf: pdf.close()
 
+def label_spans(line,aliases):
+    """Return exact whole-token label spans, longest labels first at each position."""
+    value=text(line);offsets=[];offset=0
+    for word in line:
+        offsets.append((offset,offset+len(word['text'])));offset+=len(word['text'])+1
+    found=[]
+    for alias in sorted(set(aliases),key=len,reverse=True):
+        clean=alias.strip().rstrip(':').strip()
+        pattern=r'(?<!\w)'+re.escape(clean).replace(r'\ ',r'\s+')+r'(?!\w)\s*:?'
+        for match in re.finditer(pattern,value,re.I):
+            indexes=[i for i,(a,b) in enumerate(offsets) if b>match.start() and a<match.end()]
+            if not indexes:continue
+            first,last=indexes[0],indexes[-1]
+            # Matching starts/ends within a larger token is not a label match.
+            if match.start()!=offsets[first][0]:continue
+            suffix=value[match.end():offsets[last][1]]
+            if suffix and suffix not in {':','.'}:continue
+            if clean.casefold()=='date' and first and line[first-1]['text'].rstrip(':').casefold() in {'due','delivery','payment','shipping','ship'}:continue
+            if clean.casefold() in {'vat','tax'} and last+1<len(line) and re.sub(r'[^a-z]','',line[last+1]['text'].casefold()) in {'no','nr','number','registration','reg','id'}:continue
+            if any(not(last<a or first>b) for a,b in found):continue
+            found.append((first,last))
+    return sorted(found)
+
+
+def inline_value(lines,index,span,field,fields,page):
+    line=lines[index];first,last=span
+    stop=len(line)
+    for other in fields:
+        for a,b in label_spans(line,[other['anchor']]+other.get('aliases',[])):
+            if a>last:stop=min(stop,a)
+    source=line[last+1:stop]
+    if field.get('position')=='below' or not source and field.get('fallback_below'):
+        left=line[first]['x0'];right=page['width'] if left>=page['width']*.5 else page['width']*.5
+        source=[]
+        for candidate in lines[index+1:]:
+            if candidate[0]['top']-line[0]['top']>60:break
+            selected=[w for w in candidate if w['x0']>=left-page['width']*.02 and (w['x0']+w['x1'])/2<right]
+            if selected:source=selected;break
+    # A printed dash is absence, not a numeric zero.
+    value=text(source).strip().lstrip(':').strip()
+    if field['type'] in {'currency','number'} and re.fullmatch(r'(?:R|ZAR|USD|EUR|GBP|[$€£])?\s*[-–—]*',value,re.I):value=''
+    return value,source
+
+
+def inferred_columns(line,table,width):
+    matches=[]
+    for col in table['columns']:
+        spans=label_spans(line,col.get('aliases') or [col.get('label',col['name'])])
+        if len(spans)!=1:return None
+        a,b=spans[0];matches.append((line[a]['x0'],line[b]['x1'],col))
+    matches.sort(key=lambda item:item[0])
+    if any(a[1]>b[0] for a,b in zip(matches,matches[1:])):return None
+    result=[]
+    for index,(left,right,col) in enumerate(matches):
+        # The next header's left edge gives text room to wrap; numeric columns often
+        # align values to the right of their heading, so avoid midpoint truncation.
+        start=0 if index==0 else (matches[index-1][1]+left)/2
+        end=width if index==len(matches)-1 else (right+matches[index+1][0])/2
+        result.append({**col,'x0':start/width,'x1':end/width})
+    return result
+
+
+def empty_invoice_row(cells,columns):
+    for column in columns:
+        value=cells[column['name']]
+        if column['type'] not in {'number','currency'}:
+            if value.strip():return False
+        elif re.sub(r'(?:ZAR|USD|EUR|GBP|R|[$€£]|[-–—]|\s)','',value,flags=re.I):return False
+    return True
+
+
+def summary_line(line,table,columns,width):
+    cells={c['name']:text([w for w in line if c['x0']<=((w['x0']+w['x1'])/2)/width<c['x1']]) for c in columns}
+    numeric=[c for c in columns if c['type'] in {'number','currency'}]
+    quantity=next((c for c in numeric if c['type']=='number'),None)
+    if quantity:
+        try:decimal_value(cells[quantity['name']]);return False
+        except ValueError:pass
+    for alias in table['end_anchors']:
+        for a,b in label_spans(line,[alias]):
+            # Summaries may be positioned independently of the table's columns.
+            # Require an amount directly after the whole label, not a word such
+            # as "Total" appearing inside an item description.
+            try:decimal_value(text(line[b+1:]).lstrip(':').strip())
+            except ValueError:continue
+            centre=(line[a]['x0']+line[b]['x1'])/2/width
+            col=next((c for c in columns if c['x0']<=centre<c['x1']),None)
+            if col and col['type']=='text' and cells[col['name']].strip().rstrip(':').casefold()!=text(line[a:b+1]).strip().rstrip(':').casefold():continue
+            return True
+    return False
+
+
+def invoice_body_indexes(lines,table,width):
+    blocked=set();active=False;columns=[]
+    for index,line in enumerate(lines):
+        inferred=inferred_columns(line,table,width)
+        if inferred:columns=inferred;active=True;blocked.add(index);continue
+        if not active:continue
+        if summary_line(line,table,columns,width):active=False
+        else:blocked.add(index)
+    return blocked
+
+
+def invoice_table(lines,table,page,result):
+    """Group wrapped descriptions around numeric row baselines, not text-line order."""
+    active=False;found=False;columns=[];block=[]
+    def flush():
+        if not block:return
+        numeric=[c['name'] for c in columns if c['type'] in {'number','currency'}]
+        texts=[c['name'] for c in columns if c['type']=='text']
+        mapped=[];anchors=[]
+        for line in block:
+            cells={c['name']:text([w for w in line if c['x0']<=((w['x0']+w['x1'])/2)/page['width']<c['x1']]) for c in columns}
+            if empty_invoice_row(cells,columns):continue
+            entry={'line':line,'cells':cells,'y':sum((w['top']+w['bottom'])/2 for w in line)/len(line)}
+            mapped.append(entry)
+            if any(any(ch.isdigit() for ch in cells[n]) for n in numeric):anchors.append(entry)
+        assigned={id(anchor):[anchor] for anchor in anchors}
+        for entry in mapped:
+            if any(entry is a for a in anchors):continue
+            distances=sorted((abs(entry['y']-a['y']),i,a) for i,a in enumerate(anchors))
+            if not distances or distances[0][0]>45 or len(distances)>1 and abs(distances[0][0]-distances[1][0])<1:
+                result['issues'].append(issue('unmapped_row','items',f'A table line on page {page["page"]} could not be assigned safely. Review the source and add the missing row or use fixed columns.'))
+                continue
+            if any(re.sub(r'(?:ZAR|USD|EUR|GBP|R|[$€£]|[-–—]|\s)','',entry['cells'][n],flags=re.I) for n in numeric):
+                result['issues'].append(issue('unmapped_row','items',f'Text falls inside an amount column on page {page["page"]}. Review the detected columns.'))
+            assigned[id(distances[0][2])].append(entry)
+        for anchor in anchors:
+            entries=sorted(assigned[id(anchor)],key=lambda e:e['y']);cells=dict(anchor['cells'])
+            for name in texts:cells[name]=' '.join(e['cells'][name] for e in entries if e['cells'][name]).strip()
+            words=[w for e in entries for w in e['line']]
+            cells['evidence']={'page':page['page'],'bbox':bbox(words),'text':'\n'.join(text(e['line']) for e in entries),'ocr':page.get('ocr',False)}
+            result['items'].append(cells)
+        block.clear()
+    for line in lines:
+        inferred=inferred_columns(line,table,page['width'])
+        if inferred:
+            flush();columns=inferred;active=found=True
+            result.setdefault('detected_columns',[]).append({'page':page['page'],'columns':[{k:c[k] for k in ['name','x0','x1']} for c in columns]})
+            continue
+        if not active:continue
+        if summary_line(line,table,columns,page['width']):flush();active=False;continue
+        if any(anchor_matches(text(line),v) for v in table['ignore_prefixes']):continue
+        block.append(line)
+    flush()
+    if not found:result['issues'].append(issue('table_header_missing','items',f'Invoice column headings were not found completely on page {page["page"]}. Check Quantity, Description, Unit price and Amount aliases, or choose fixed columns.','review'))
+
+
 def extract_pages(pages,template):
     validate_template(template)
     result={'fields':{f['name']:'' for f in template['fields']},'items':[],'evidence':{},'issues':[],'text_pdf':True,'ocr':any(p.get('ocr') for p in pages)}
     matched={};table=template['table']; any_text=False
     for page in pages:
         words=page.get('words',[]);any_text|=bool(words);lines=lines_for(words)
+        table_body=invoice_body_indexes(lines,table,page['width']) if table.get('enabled') and table.get('mode')=='header' else set()
         result['issues'].extend(page.get('warnings',[]))
         for field in template['fields']:
             anchor=field['anchor'].strip()
             for index,line in enumerate(lines):
                 line_text=text(line)
+                if field.get('match_mode')=='inline':
+                    if index in table_body:continue
+                    for span in label_spans(line,[anchor]+field.get('aliases',[])):
+                        value,source=inline_value(lines,index,span,field,template['fields'],page)
+                        if value and source:
+                            matched.setdefault(field['name'],[]).append(value)
+                            result['fields'][field['name']]=value
+                            result['evidence'][field['name']]={'page':page['page'],'bbox':bbox(source),'text':text(source),'ocr':page.get('ocr',False)}
+                    continue
                 if anchor_matches(line_text,anchor):
                     source=line
                     if field.get('position')=='below':
@@ -220,14 +386,17 @@ def extract_pages(pages,template):
                         result['fields'][field['name']]=value
                         result['evidence'][field['name']]={'page':page['page'],'bbox':bbox(source),'text':text(source),'ocr':page.get('ocr',False)}
         if not table.get('enabled'):continue
-        active=False;found=False
+        if table.get('mode')=='header':
+            invoice_table(lines,table,page,result)
+            continue
+        active=False;found=False;columns=table['columns']
         for line in lines:
-            value=text(line); lower=value.casefold()
+            value=text(line)
             if anchor_matches(value,table['header_anchor']):active=found=True;continue
             if not active:continue
             if any(anchor_matches(value,v) for v in table['end_anchors']):active=False;continue
             if any(anchor_matches(value,v) for v in table['ignore_prefixes']):continue
-            cells={c['name']:text([w for w in line if c['x0']<=((w['x0']+w['x1'])/2)/page['width']<c['x1']]) for c in table['columns']}
+            cells={c['name']:text([w for w in line if c['x0']<=((w['x0']+w['x1'])/2)/page['width']<c['x1']]) for c in columns}
             if not any(cells.values()):
                 result['issues'].append(issue('unmapped_row','items',f'Text outside the configured columns on page {page["page"]}: {value}'))
                 continue
@@ -245,7 +414,9 @@ def extract_pages(pages,template):
         if words and not found:result['issues'].append(issue('table_header_missing','items',f'Table header not found on page {page["page"]}; verify this page was not needed.','review'))
     result['text_pdf']=any_text
     for name,values in matched.items():
-        if len(set(values))>1:result['issues'].append(issue('conflicting_field','fields.'+name,f'Multiple different values found for {name}.','review'))
+        if len(set(values))>1:
+            result['issues'].append(issue('conflicting_field','fields.'+name,f'Multiple different values found for {name}.','review'))
+            if next(f for f in template['fields'] if f['name']==name).get('match_mode')=='inline':result['fields'][name]=''
     result['extraction_issues']=json.loads(json.dumps(result['issues']))
     return validate_result(result,template)
 
@@ -262,8 +433,12 @@ def validate_result(result,template):
                 number=decimal_value(value)
                 if kind=='currency' and number!=number.quantize(Decimal('.01')):raise ValueError('Currency amounts require at most two decimal places; no rounding was applied.')
                 obj[field['name']]=format(number,'.2f') if kind=='currency' else format(number,'f')
-            elif kind=='date':date.fromisoformat(value)
+            elif kind=='date':
+                normalized=normalize_date(value,field)
+                if normalized!=value:result.setdefault('normalizations',{})[path]={'source':value,'normalized':normalized,'rule':field.get('date_format','iso')}
+                obj[field['name']]=normalized
             elif kind=='email' and not re.fullmatch(r'[^\s@]+@[^\s@]+\.[^\s@]+',value):raise ValueError('Use a valid email address')
+        except AmbiguousDate as exc:issues.append(issue('date_ambiguous',path,f'{field.get("label",field["name"])} needs a date format: {exc}.'))
         except (ValueError,InvalidOperation):issues.append(issue('type',path,f'{field.get("label",field["name"])} is not a valid {field["type"]}. Check the source; dates use YYYY-MM-DD and decimals use a dot.'))
     for field in template['fields']:validate_value(result['fields'],field,'fields.'+field['name'])
     rows=result.get('items',[])

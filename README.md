@@ -8,19 +8,19 @@ All extraction, OCR, validation and storage run locally. No account, hosted serv
 
 The v1 build supports **Apple Silicon Macs running macOS 13 or later**. Intel Macs, Windows and iOS are not included.
 
-1. Open `Fieldwork-1.0.1-mac-arm64.dmg` and drag Fieldwork to Applications.
+1. Open `Fieldwork-1.0.2-mac-arm64.dmg` and drag the Fieldwork icon along the arrow to Applications.
 2. Open Fieldwork from Applications. You do not need Python, Node, pip or a terminal.
 3. Choose **Import documents** to use your files, or try the optional example.
 
-To update an existing installation, quit Fieldwork, replace only the app in Applications, then reopen it. Documents, templates and settings remain in the separate Application Support workspace. Version 1.0.1 fixes the file-picker import race that could incorrectly reject a selected PDF/image after the picker reset; it does not change the database format.
+To update an existing installation, quit Fieldwork, replace only the app in Applications, then reopen it. Documents, templates and settings remain in the separate Application Support workspace. Version 1.0.2 adds an Invoice starter and a clearer installer; it does not change the database format or alter existing templates automatically.
 
 This initial distribution is ad-hoc signed and not notarized. If macOS blocks it, verify that the file came from the intended source and that its SHA256 matches the supplied checksum. Use macOS's per-app **Privacy & Security → Open Anyway** option if available and you trust that build. Do not disable Gatekeeper globally. Local acceptance on the build Mac does not establish downloaded-app acceptance on every Mac.
 
 ## The working flow
 
 1. **Documents:** import PDF, PNG, JPEG or TIFF files. Select documents and a template, then process the batch. Progress, failures, cancellation and retry are visible; unfinished jobs resume after the app reopens.
-2. **Templates:** create a named template with your own header fields. Supported types are text, number, currency, ISO date and email. Set required fields, literal text anchors, and whether a value appears after or below its label. Click source text to teach an anchor.
-3. For a repeating table, enable the table, set its header/end markers and column definitions, and adjust the column boundaries against the source. Repeated headers and configured footer prefixes are excluded across pages. One optional repeating table is supported per template.
+2. **Templates:** start with Invoice, Purchase order or Blank, then create a named template with your own header fields. Supported types are text, number, currency, date and email. Set required fields, literal text anchors, and whether a value appears after or below its label. Click source text to teach an anchor.
+3. For a repeating table, enable the table, set its header/end markers and column definitions, and adjust the column boundaries against the source. The Invoice starter detects columns from complete Quantity, Description, Unit price and Amount headings and their configured aliases, including reordered columns; choose fixed columns for other layouts. Repeated headers and configured footer prefixes are excluded across pages. One optional repeating table is supported per template.
 4. Enable financial validation when useful. It checks quantity × unit price, the sum of line amounts against subtotal, and subtotal + tax against total using exact decimal arithmetic. Disable it for forms, price lists and other nonfinancial documents.
 5. **Review:** compare values with highlighted source evidence. Correct fields or cells, add missing rows or remove spurious rows, then save and recheck. The original file and raw extraction remain preserved. Editing or reprocessing revokes approval. Template updates create a new version; previous documents retain their extraction's template snapshot.
 6. Resolve duplicate warnings explicitly with **Keep both** or **Ignore**. Keep both covers the current conflict set only. A later new copy requires another review. Ignoring a document excludes it from export and keeps its original available.
@@ -28,6 +28,12 @@ This initial distribution is ad-hoc signed and not notarized. If macOS blocks it
 8. **Export:** CSV and Excel support chosen columns and headings; API callers can also set column order. JSON preserves the structured fields, rows, approval label, issues and review note. Only approved, nonarchived, nonignored documents export. If a new duplicate or issue invalidates an earlier approval, the entire export is stopped with named documents to review; nothing is silently omitted.
 
 Search and filter the document library, or archive documents without deleting their originals. Templates can be exported/imported as portable JSON. The activity log retains extraction, edit, approval and duplicate decisions.
+
+For an invoice, import the file and choose **Use invoice template**, or **New template → Invoice**, then **Save & process**. This makes a new template instead of changing a saved purchase-order template. Review Bill to, Invoice number, Invoice date, the rows and the footer values against their highlighted source. The Invoice starter supports literal labels beside other text and wrapped item descriptions. Ambiguous labels or missing headings remain review issues.
+
+Invoice dates use **Detect unambiguous dates** by default: `6/24/26` becomes `2026-06-24`, while `6/7/26` requires an explicit day/month or month/day choice, or a reviewed correction. The starter explicitly interprets two-digit years as 2000–2099; four-digit years avoid that convention. Existing templates remain ISO-only unless you choose another date format. The original source text and normalized date evidence are retained.
+
+Tax and Invoice total are optional in the Invoice starter and remain blank when not printed. Balance due is separate from Invoice total because payments or credits can make them different. VAT registration numbers are not tax amounts. Arithmetic checks only use the printed/configured values; the app does not infer missing tax or a grand total to make a document pass.
 
 ## Watch folders, backups and local automation
 
@@ -64,7 +70,7 @@ Open `http://localhost:4341`. For source development only, use the generated `wo
 
 ```sh
 .venv/bin/python -m unittest discover -s tests
-node --test tests/import-files.test.mjs
+node --test tests/*.mjs
 ./scripts/package-mac.sh --app-only
 .packaging-venv/bin/python tests/acceptance_product.py
 ./scripts/package-mac.sh

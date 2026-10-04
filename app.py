@@ -19,9 +19,9 @@ from openpyxl import Workbook
 from werkzeug.serving import make_server, WSGIRequestHandler
 from backend.storage import Store
 from backend.service import Service, EXTENSIONS
-from backend.engine import DEFAULT_TEMPLATE, validate_result, validate_export_columns, render_original
+from backend.engine import DEFAULT_TEMPLATE, INVOICE_TEMPLATE, validate_result, validate_export_columns, render_original
 
-VERSION='1.0.1'
+VERSION='1.0.2'
 BASE=Path(getattr(sys,'_MEIPASS',Path(__file__).resolve().parent))
 PORT=int(os.environ.get('FIELDWORK_PORT','4341'))
 DATA=Path(os.environ.get('FIELDWORK_DATA_DIR',str(Path.home()/'Library/Application Support/Fieldwork'))).expanduser().resolve()
@@ -128,7 +128,7 @@ def state():
         templates=[json.loads(row['payload'])|{'archived':bool(row['archived'])} for row in conn.execute('SELECT * FROM templates ORDER BY updated_at DESC')]
         jobs=[job_dto(row) for row in conn.execute('SELECT * FROM jobs ORDER BY created_at DESC LIMIT 200')]
         watches=[{'id':r['id'],'path':r['path'],'templateId':r['template_id'],'enabled':bool(r['enabled']),'error':r['error']} for r in conn.execute('SELECT * FROM watches ORDER BY created_at')]
-    return jsonify(csrfToken=CSRF,version=VERSION,documents=documents,templates=templates,defaultTemplate=DEFAULT_TEMPLATE,jobs=jobs,watches=watches,settings=store.setting('settings',{}),samples=[p.name for p in (BASE/'samples').glob('*.pdf')],ocrAvailable=bool(service.ocr_binary))
+    return jsonify(csrfToken=CSRF,version=VERSION,documents=documents,templates=templates,defaultTemplate=DEFAULT_TEMPLATE,templatePresets=[{'id':'invoice','name':'Invoice','description':'Find invoice labels and table columns, then review the source.','template':INVOICE_TEMPLATE}],jobs=jobs,watches=watches,settings=store.setting('settings',{}),samples=[p.name for p in (BASE/'samples').glob('*.pdf')],ocrAvailable=bool(service.ocr_binary))
 
 @app.get('/api/documents/<id>')
 def document(id):

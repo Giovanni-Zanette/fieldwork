@@ -10,3 +10,6 @@
 .status.approved_with_exceptions{color:#7b4e05;background:#f6e6ba}.badge.warning{color:#714905}
 
 @media(max-width:700px){.library{max-height:300px;min-height:285px;overflow-y:auto}.library-top,.library-select,.library-bottom{flex-shrink:0}.document-list{flex:none;min-height:70px}.jobs-box{flex-shrink:0;max-height:90px}}
+
+/* Keep starter processing simple; layout rules remain available when needed. */
+.preset-intro{margin:16px 0;padding:13px 14px;background:var(--green-soft);border-radius:7px;font-size:12px}.preset-intro p{font-size:11px;margin:6px 0 0}.template-advanced{margin:16px 0}.template-advanced>summary{font-size:12px;font-weight:600;cursor:pointer;padding:10px 0;color:var(--green-dark)}.template-advanced>summary:focus-visible{outline:3px solid var(--focus);outline-offset:3px}.date-correction{color:var(--warning)}
