@@ -37,4 +37,8 @@ Templates use `{id?,name,version?,fields:[{name,label,type:'text'|'number'|'date
 | POST `/api/backup/restore` | Multipart `backup`, `confirm=RESTORE`; validates manifest/paths/size; automatic pre-restore snapshot, requires no running jobs; preserves current API key |
 | POST `/api/security/key` | Explicit user action returns `{token}` current agent API key (never part of state) |
 
+Duplicate `keep` means Keep both for the current conflict membership/identifier fingerprint, not all future copies. Approval stores the accepted issue fingerprint. Export revalidates under the operation lock; new duplicate conflicts or changed issues revoke affected approvals and return409 `{error,blockedDocuments:[{id,name,issues}]}` after committing the review status. The entire requested export is cancelled, with no partial file or silent omission. Existing explicit exception approvals cover only their recorded issue set.
+
+CSV/XLSX honor column mappings. JSON preserves original structured field names, items, approval labels, issues and review notes. `review_note` is also a supported CSV/XLSX column source. Document DTO includes `templateSnapshot` for immutable extraction labels/columns. All OCR results require review; intentional overrides receive `approved_with_exceptions`, not `approved`.
+
 Errors JSON `{error}`. No exported rows leave the Mac automatically. Jobs resume as queued after restart; cancelled jobs remain cancelled. Watch polling happens only while app runs. UI polls state every2seconds while jobs active (slower otherwise).

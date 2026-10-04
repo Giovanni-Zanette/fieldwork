@@ -91,9 +91,12 @@ class Service:
     def progress(self,id,value):
         with self.store.connect() as conn:conn.execute('UPDATE jobs SET progress=?,updated_at=? WHERE id=?',(value,time.time(),id))
 
-    def mark_duplicates(self,conn,id,result,template,decision=None):
-        result['issues']=[i for i in result['issues'] if i['code']!='duplicate']
-        current=self.document(id,conn);duplicate=None
+    @staticmethod
+    def fingerprint(value):
+        return hashlib.sha256(json.dumps(value,sort_keys=True,separators=(',',':'),ensure_ascii=False).encode()).hexdigest()
+
+    def duplicate_conflicts(self,conn,id,result,template):
+        current=self.document(id,conn);conflicts=[]
         keys=template.get('duplicate_fields',[])
         for other in conn.execute('SELECT id,hash,result_json,duplicate_decision FROM documents WHERE id<>? AND archived=0 ORDER BY created_at,id',(id,)):
             if other['duplicate_decision']=='ignore':continue
@@ -101,8 +104,18 @@ class Service:
             if not exact and keys and other['result_json']:
                 other_fields=json.loads(other['result_json']).get('fields',{})
                 exact=all(str(result['fields'].get(n,'')).strip() and str(result['fields'].get(n,'')).strip().casefold()==str(other_fields.get(n,'')).strip().casefold() for n in keys)
-            if exact:duplicate=other['id'];break
-        if duplicate and decision!='keep':result['issues'].append(issue('duplicate','', 'Another document has the same source file or configured identifiers. Choose Keep both or Ignore this duplicate before approval.','review'))
+            if exact:conflicts.append(other['id'])
+        return sorted(conflicts)
+
+    def duplicate_signature(self,conn,id,result,template):
+        return self.fingerprint({'conflicts':self.duplicate_conflicts(conn,id,result,template),'fields':{k:str(result['fields'].get(k,'')).strip().casefold() for k in template.get('duplicate_fields',[])}})
+
+    def mark_duplicates(self,conn,id,result,template,decision=None):
+        result['issues']=[i for i in result['issues'] if i['code']!='duplicate']
+        conflicts=self.duplicate_conflicts(conn,id,result,template);duplicate=conflicts[0] if conflicts else None
+        current=self.document(id,conn)
+        accepted=decision=='keep' and current['duplicate_fingerprint']==self.duplicate_signature(conn,id,result,template)
+        if duplicate and not accepted:result['issues'].append(issue('duplicate','', 'Another document has the same source file or configured identifiers. Choose Keep both or Ignore this duplicate before approval.','review'))
         result['status']='needs_review' if result['issues'] else 'validated'
         return duplicate
 
@@ -242,6 +255,7 @@ class Service:
                 try:source.backup(target)
                 finally:source.close();target.close()
                 with self.store.connect(True) as conn:
+                    Store.ensure_columns(conn)
                     conn.execute('UPDATE watches SET enabled=0,error=?',('Restored watch folders are paused. Review paths before enabling.',))
                     conn.execute("UPDATE jobs SET status='queued',progress=0 WHERE status='running'")
                     Store.audit(conn,None,'backup_restored',{'safetyBackup':backup_path.name})

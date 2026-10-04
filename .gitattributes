@@ -1,0 +1,4 @@
+*.pdf binary
+*.png binary
+# Preserve upstream license text verbatim, including its original whitespace.
+desktop/licenses/** -whitespace

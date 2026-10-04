@@ -2,6 +2,7 @@
 from datetime import date, datetime
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 import json
+import math
 from pathlib import Path
 import re
 import subprocess
@@ -110,17 +111,24 @@ def anchor_matches(value,anchor):
     # A column headed SKU must not swallow data such as SKU-123 as another header.
     return len(value)==len(anchor) or value[len(anchor)].isspace() or anchor.endswith((':','='))
 
+def check_render_size(width,height,pdf=False):
+    scale=200/72 if pdf else 1
+    w=float(width)*scale;h=float(height)*scale
+    if not math.isfinite(w) or not math.isfinite(h) or min(w,h)<=0 or max(w,h)>16000 or w*h>40000000:
+        raise ValueError('Page exceeds the safe rendering limit of 40 megapixels or 16,000 pixels per edge')
+
 def metadata(path):
     path=Path(path)
     if path.suffix.lower()=='.pdf':
         with pdfplumber.open(path) as pdf:
             if not 1<=len(pdf.pages)<=100: raise ValueError('Use PDFs with 1–100 pages')
+            for page in pdf.pages:check_render_size(page.width,page.height,True)
             return [{'page':i+1,'width':p.width,'height':p.height,'lines':[{'text':text(line),'bbox':bbox(line)} for line in lines_for(p.extract_words(x_tolerance=2,y_tolerance=3))]} for i,p in enumerate(pdf.pages)]
     with Image.open(path) as image:
         if getattr(image,'n_frames',1)>100: raise ValueError('Use at most 100 image pages')
         pages=[]
         for i,frame in enumerate(ImageSequence.Iterator(image)):
-            if frame.width*frame.height>50000000:raise ValueError('Image exceeds 50 megapixels')
+            check_render_size(frame.width,frame.height)
             pages.append({'page':i+1,'width':frame.width,'height':frame.height,'lines':[]})
         return pages
 
@@ -128,10 +136,12 @@ def render_original(path,page,outfile):
     path=Path(path)
     if path.suffix.lower()=='.pdf':
         with pdfplumber.open(path) as pdf:
+            check_render_size(pdf.pages[page-1].width,pdf.pages[page-1].height,True)
             pdf.pages[page-1].to_image(resolution=200).original.save(outfile,format='PNG')
     else:
         with Image.open(path) as im:
             im.seek(page-1)
+            check_render_size(im.width,im.height)
             ImageOps.exif_transpose(im).convert('RGB').save(outfile,format='PNG')
 
 def run_ocr(command,cancelled):

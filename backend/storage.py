@@ -28,10 +28,17 @@ class Store:
         self.path = self.root / 'fieldwork.sqlite'
         with self.connect() as conn:
             conn.executescript(SCHEMA)
+            self.ensure_columns(conn)
             conn.execute("INSERT OR IGNORE INTO meta VALUES('schema_version','1')")
             # A crash cannot leave a job permanently running or publish half an extraction.
             conn.execute("UPDATE jobs SET status=CASE WHEN cancel_requested=1 THEN 'cancelled' ELSE 'queued' END,progress=0,updated_at=? WHERE status='running'", (time.time(),))
         os.chmod(self.path, 0o600)
+
+    @staticmethod
+    def ensure_columns(conn):
+        columns={r[1] for r in conn.execute('PRAGMA table_info(documents)')}
+        for name in ['approval_fingerprint','duplicate_fingerprint']:
+            if name not in columns:conn.execute(f'ALTER TABLE documents ADD COLUMN {name} TEXT')
 
     @contextmanager
     def connect(self, immediate=False):

@@ -252,9 +252,11 @@ def duplicate(id):
         row=service.document(id,conn)
         if not row['result_json'] or row['status'] in {'queued','processing'}:raise ValueError('Finish processing first')
         result=json.loads(row['result_json']);template=json.loads(row['template_snapshot']);validate_result(result,template)
+        signature=service.duplicate_signature(conn,id,result,template) if decision=='keep' else None
+        conn.execute('UPDATE documents SET duplicate_fingerprint=? WHERE id=?',(signature,id))
         found=service.mark_duplicates(conn,id,result,template,decision)
         conn.execute('UPDATE documents SET duplicate_decision=?,duplicate_of=?,status=?,result_json=?,approval_note=NULL,revision=revision+1,updated_at=? WHERE id=?',(decision,found,'ignored' if decision=='ignore' else result['status'],json.dumps(result),time.time(),id))
-        Store.audit(conn,id,'duplicate_'+decision,{'note':note,'duplicateOf':found})
+        Store.audit(conn,id,'duplicate_'+decision,{'note':note,'duplicateOf':found,'conflicts':service.duplicate_conflicts(conn,id,result,template),'fingerprint':signature})
     return jsonify(ok=True)
 
 @app.post('/api/documents/<id>/approve')
@@ -269,7 +271,7 @@ def approve(id):
         # A deliberate audit override is not relabelled as mathematically validated.
         if result['issues'] and not (payload.get('override') is True and len(note)>=10):return jsonify(error='Review the listed issues. An explicit reason of at least 10 characters is required to override.',issues=result['issues']),409
         status='approved_with_exceptions' if result['issues'] else 'approved'
-        conn.execute('UPDATE documents SET status=?,result_json=?,duplicate_of=?,approval_note=?,revision=revision+1,updated_at=? WHERE id=?',(status,json.dumps(result),duplicate,note,time.time(),id))
+        conn.execute('UPDATE documents SET status=?,result_json=?,duplicate_of=?,approval_note=?,approval_fingerprint=?,revision=revision+1,updated_at=? WHERE id=?',(status,json.dumps(result),duplicate,note,service.fingerprint(result['issues']),time.time(),id))
         Store.audit(conn,id,'approved',{'override':bool(result['issues']),'issues':result['issues'],'note':note})
     return jsonify(status=status,revision=row['revision']+1)
 
@@ -303,15 +305,40 @@ def source(id):
 
 @app.post('/api/export')
 def export():
-    payload=request.get_json();format=payload.get('format');ids=payload.get('documentIds')
-    if format not in {'csv','xlsx','json'}:raise ValueError('Choose CSV, Excel or JSON')
+    # Hold the same lock through validation and serialization: imports/extractions cannot
+    # introduce a new duplicate between approval validation and the exported snapshot.
+    payload=request.get_json()
+    with service.operation_lock:
+        with store.connect(True) as conn:
+            documents=export_selection(conn,payload)
+            blocked=[]
+            for row in documents:
+                result=json.loads(row['result_json']);template=json.loads(row['template_snapshot'])
+                validate_result(result,template)
+                duplicate=service.mark_duplicates(conn,row['id'],result,template,row['duplicate_decision'])
+                if any(i['code']=='duplicate' for i in result['issues']) or result['issues'] and service.fingerprint(result['issues'])!=row['approval_fingerprint']:
+                    blocked.append({'id':row['id'],'name':row['name'],'issues':result['issues']})
+                    conn.execute("UPDATE documents SET status='needs_review',result_json=?,duplicate_of=?,approval_note=NULL,approval_fingerprint=NULL,revision=revision+1,updated_at=? WHERE id=?",(json.dumps(result),duplicate,time.time(),row['id']))
+                    Store.audit(conn,row['id'],'approval_invalidated_at_export',{'issues':result['issues']})
+        # Return after commit, so the revoked approvals remain visible in the library.
+        if blocked:return jsonify(error='Export cancelled. Review new issues in: '+', '.join(r['name'] for r in blocked),blockedDocuments=blocked),409
+        return export_data(payload)
+
+def export_selection(conn,payload):
+    if payload.get('format') not in {'csv','xlsx','json'}:raise ValueError('Choose CSV, Excel or JSON')
+    ids=payload.get('documentIds')
+    documents=conn.execute("SELECT * FROM documents WHERE status IN ('approved','approved_with_exceptions') AND archived=0 AND COALESCE(duplicate_decision,'')<>'ignore' ORDER BY created_at,id").fetchall()
+    if ids is not None:
+        if not isinstance(ids,list) or len(ids)>5000:raise ValueError('Invalid document selection')
+        documents=[r for r in documents if r['id'] in ids]
+        if set(ids)!={r['id'] for r in documents}:raise ValueError('The selection contains unapproved, ignored or archived documents. Export cancelled.')
+    if not documents:raise ValueError('Approve at least one document before exporting')
+    return documents
+
+def export_data(payload):
+    format=payload.get('format')
     with service.operation_lock,store.connect() as conn:
-        documents=conn.execute("SELECT * FROM documents WHERE status IN ('approved','approved_with_exceptions') AND archived=0 AND COALESCE(duplicate_decision,'')<>'ignore' ORDER BY created_at,id").fetchall()
-        if ids is not None:
-            if not isinstance(ids,list) or len(ids)>5000:raise ValueError('Invalid document selection')
-            documents=[r for r in documents if r['id'] in ids]
-            if set(ids)!={r['id'] for r in documents}:raise ValueError('The selection contains unapproved, ignored or archived documents. Export cancelled.')
-        if not documents:raise ValueError('Approve at least one document before exporting')
+        documents=export_selection(conn,payload)
         template=json.loads(documents[0]['template_snapshot']);columns=payload.get('columns') or template.get('export_columns')
         if not columns:
             fields=list(dict.fromkeys(k for r in documents for k in json.loads(r['result_json'])['fields']))

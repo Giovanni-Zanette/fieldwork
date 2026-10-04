@@ -8,13 +8,17 @@ import tempfile
 import time
 import unittest
 import zipfile
-from backend.engine import DEFAULT_TEMPLATE, decimal_value, validate_template, validate_result, extract_pages, read_pages, anchor_matches
+from backend.engine import DEFAULT_TEMPLATE, decimal_value, validate_template, validate_result, extract_pages, read_pages, anchor_matches, check_render_size
 from backend.storage import Store
 from backend.service import Service
 
 ROOT=Path(__file__).resolve().parents[1]
 
 class EngineTests(unittest.TestCase):
+    def test_render_bounds_reject_pathological_dimensions(self):
+        check_render_size(595,842,True)
+        for dimensions in [(100000,100000),(0,300),(float('nan'),300),(float('inf'),300)]:
+            with self.assertRaises(ValueError):check_render_size(*dimensions,True)
     def test_literal_anchor_respects_header_token_boundary(self):
         self.assertTrue(anchor_matches('SKU Description Price','SKU'))
         self.assertFalse(anchor_matches('SKU-123 Wooden tray','SKU'))
@@ -98,7 +102,10 @@ class ServiceTests(unittest.TestCase):
         a=self.import_sample();b=self.import_sample();jobs=self.service.queue([a,b],self.template);self.service.start()
         for id in jobs:self.assertEqual(self.await_job(id)['status'],'completed')
         row=self.service.document(a);result=json.loads(row['result_json']);self.assertIn('duplicate',[i['code'] for i in result['issues']])
-        with self.store.connect() as conn:self.service.mark_duplicates(conn,a,result,json.loads(row['template_snapshot']),'keep')
+        with self.store.connect() as conn:
+            template=json.loads(row['template_snapshot'])
+            conn.execute('UPDATE documents SET duplicate_fingerprint=? WHERE id=?',(self.service.duplicate_signature(conn,a,result,template),a))
+            self.service.mark_duplicates(conn,a,result,template,'keep')
         self.assertNotIn('duplicate',[i['code'] for i in result['issues']])
 
     def test_backup_restore_preserves_sources_and_pauses_watches(self):

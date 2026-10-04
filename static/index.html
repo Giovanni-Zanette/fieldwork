@@ -1,6 +1,26 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Fieldwork · Local extraction prototype</title><link rel="stylesheet" href="/static/style.css"><script defer src="/static/app.js"></script></head><body>
-<header><a class="brand" href="/">▦ <strong>Fieldwork</strong><span>Document workbench</span></a><div class="local"><i></i> On this Mac <span class="pill">Prototype</span></div></header>
-<div class="notice">A small test of a paid document-parsing workflow. Fictional samples · Text PDFs only · No cloud, AI or API keys.</div>
-<main><aside class="queue"><div class="aside-title"><div><small>INBOX</small><h2>Your documents</h2></div><span id="count">0</span></div><label class="upload"><input id="upload" type="file" accept="application/pdf" multiple><b>＋ Add PDFs</b><span>Up to 10 files · 10 MB each</span></label><div id="sample-actions"></div><div class="queue-tools"><button id="extract-all" class="primary">Process unapproved</button><small id="recipe-hint">Save a recipe to start.</small></div><div id="documents"></div><div class="export"><small>APPROVED DOCUMENTS ONLY</small><div><a href="/api/export/csv" id="csv" class="button">Export CSV ↗</a><a href="/api/export/xlsx" id="xlsx" class="button">Excel ↗</a></div><p>One row per line item. Unreviewed documents stay here.</p></div></aside>
-<section class="canvas"><div class="canvas-bar"><div><small>SOURCE DOCUMENT</small><h2 id="doc-title">Start with a sample PDF</h2></div><div><button id="previous" aria-label="Previous page">←</button><span id="page-label">—</span><button id="next" aria-label="Next page">→</button><a id="source" class="button hidden">Original ↗</a></div></div><div id="source-scroll"><div id="empty"><div class="paper-icon">▤</div><h1>Teach it once.<br>Check what matters.</h1><p>Add a recurring purchase order, name the fields you need, then reuse your recipe on the next batch.</p><button id="first-sample" class="primary">Try a fictional sample →</button></div><div id="paper" class="hidden"><img id="page-image" alt="Original source PDF page"><div id="overlays"></div></div></div><div class="canvas-footer" id="source-help">Your documents are processed locally. Scanned PDFs are flagged for review.</div></section>
-<aside class="inspector"><nav><button id="teach-tab" class="active">1 · Teach recipe</button><button id="review-tab">2 · Review data</button></nav><div id="inspector-body"></div></aside></main><div id="toast" role="status" aria-live="polite"></div><dialog id="override-dialog"><form method="dialog"><h2>Approve with unresolved issues?</h2><p>Only continue after checking the original PDF. Your explanation is included in the export and local audit history.</p><label>Review note<textarea id="override-note" minlength="8" placeholder="Explain what you checked or accepted…"></textarea></label><div class="actions"><button value="cancel">Back to review</button><button type="button" id="confirm-override" class="primary">Approve with note</button></div></form></dialog></body></html>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light"><meta name="description" content="Fieldwork is your local document extraction workspace.">
+  <title>Fieldwork — Document workspace</title>
+  <link rel="icon" type="image/svg+xml" href="/static/fieldwork.svg">
+  <link rel="stylesheet" href="/static/style.css">
+  <script type="module" src="/static/app.js"></script>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to workspace</a>
+<header class="app-header">
+  <a class="brand" href="/" aria-label="Fieldwork home"><img src="/static/fieldwork.svg" alt="" width="30" height="30"><strong>Fieldwork</strong></a>
+  <nav class="main-nav" aria-label="Workspace"><button data-view="documents" class="active" aria-current="page">Documents</button><button data-view="templates">Templates</button><button data-view="watch">Watch folders</button><button data-view="settings">Settings</button></nav>
+  <div class="local-status"><span class="status-dot"></span><span>On this Mac</span><button id="help-button" class="icon-button" aria-label="Help and keyboard shortcuts"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 1 1 3.6 2.25C12 11.8 12 12.4 12 14m0 3h.01"/></svg></button></div>
+</header>
+<div id="connection-error" class="connection-error hidden" role="alert"></div>
+<main id="main" tabindex="-1"><div class="loading-screen" role="status"><img src="/static/fieldwork.svg" alt="" width="40" height="40"><p>Opening your workspace…</p></div></main>
+<div id="upload-overlay" class="upload-overlay hidden"><div><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4m-4 4 4-4 4 4M4 15v5h16v-5"/></svg><h2>Add documents</h2><p>Drop PDF, PNG or JPEG files to import them.</p></div></div>
+<div id="notifications" class="notifications" aria-live="polite" aria-atomic="false"></div>
+<dialog id="dialog"><div id="dialog-content"></div></dialog>
+<input id="file-picker" class="visually-hidden" type="file" accept="application/pdf,image/png,image/jpeg,image/tiff" multiple aria-label="Import documents">
+<input id="template-picker" class="visually-hidden" type="file" accept="application/json,.json" aria-label="Import a template">
+<input id="backup-picker" class="visually-hidden" type="file" accept="application/zip,.zip" aria-label="Restore a workspace backup">
+</body></html>

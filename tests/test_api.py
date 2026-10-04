@@ -101,4 +101,19 @@ class APITests(unittest.TestCase):
         self.assertEqual(self.post('/api/documents/'+id+'/approve',{'revision':doc['reviewRevision']}).status_code,200)
         self.assertEqual(self.post('/api/export',{'format':'csv','documentIds':[other]}).status_code,400)
 
+    def test_late_duplicate_blocks_export_and_keep_does_not_cover_future_copy(self):
+        id,template=self.prepared();doc=self.get_document(id)
+        self.assertEqual(self.post('/api/documents/'+id+'/approve',{'revision':doc['reviewRevision']}).status_code,200)
+        self.post('/api/samples',{'name':'purchase-order.pdf'})
+        response=self.post('/api/export',{'format':'csv','documentIds':[id]})
+        self.assertEqual(response.status_code,409)
+        self.assertEqual(response.get_json()['blockedDocuments'][0]['id'],id)
+        self.assertEqual(self.get_document(id)['status'],'needs_review')
+        self.post('/api/documents/'+id+'/duplicate',{'decision':'keep','note':'Both current copies intentional'})
+        doc=self.get_document(id);self.post('/api/documents/'+id+'/approve',{'revision':doc['reviewRevision']})
+        self.assertEqual(self.post('/api/export',{'format':'csv','documentIds':[id]}).status_code,200)
+        self.post('/api/samples',{'name':'purchase-order.pdf'})
+        self.assertEqual(self.post('/api/export',{'format':'csv','documentIds':[id]}).status_code,409)
+        self.assertEqual(self.get_document(id)['status'],'needs_review')
+
 if __name__=='__main__':unittest.main()

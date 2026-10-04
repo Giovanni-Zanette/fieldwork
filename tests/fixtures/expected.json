@@ -1,0 +1,100 @@
+{
+  "created": "2026-10-04T11:50:28.145712+00:00",
+  "purpose": "Independent product acceptance; all synthetic; no invoice/order source values supplied to app builder before extraction.",
+  "expected": {
+    "invoice-unseen.pdf": {
+      "fields": {
+        "vendor": "Juniper Studio Test",
+        "invoice_id": "INV-QA-732",
+        "date": "2026-10-04",
+        "email": "buyer@example.invalid",
+        "subtotal": "377.75",
+        "tax": "56.66",
+        "total": "434.41"
+      },
+      "items": [
+        {
+          "description": "Design audit",
+          "quantity": "2",
+          "unit_price": "125.50",
+          "line_total": "251.00"
+        },
+        {
+          "description": "Research pack",
+          "quantity": "3",
+          "unit_price": "42.25",
+          "line_total": "126.75"
+        }
+      ]
+    },
+    "price-list-unseen.pdf": {
+      "fields": {
+        "supplier": "Oak Supply Test",
+        "effective": "2026-10-04"
+      },
+      "items": [
+        {
+          "sku": "SKU-Q71",
+          "description": "Amber notebook",
+          "price": "23.75"
+        },
+        {
+          "sku": "SKU-Q72",
+          "description": "Graph paper pack",
+          "price": "49.90"
+        }
+      ]
+    },
+    "custom-form-unseen.pdf": {
+      "fields": {
+        "reference": "SR-QA-913",
+        "contact": "Mara Fiction",
+        "email": "mara@example.invalid",
+        "appointment": "2026-11-05"
+      },
+      "items": []
+    },
+    "multipage-unseen.pdf": {
+      "fields": {
+        "supplier": "Maple Test",
+        "order_number": "MP-QA-819",
+        "order_date": "2026-10-04",
+        "subtotal": "100.00",
+        "tax": "15.00",
+        "total": "115.00"
+      },
+      "items": [
+        {
+          "description": "Index cards",
+          "quantity": "2",
+          "unit_price": "10.00",
+          "line_total": "20.00"
+        },
+        {
+          "description": "Clip pack",
+          "quantity": "4",
+          "unit_price": "5.00",
+          "line_total": "20.00"
+        },
+        {
+          "description": "Desk pad",
+          "quantity": "1",
+          "unit_price": "30.00",
+          "line_total": "30.00"
+        },
+        {
+          "description": "Folder set",
+          "quantity": "3",
+          "unit_price": "10.00",
+          "line_total": "30.00"
+        }
+      ]
+    }
+  },
+  "sha256": {
+    "price-list-unseen.pdf": "cf073e8a61144b47266e778a5645ca2da69ac9d55a8cf98eecac27ad1393203e",
+    "invoice-unseen.pdf": "e40679c2dc022fa7c4dd37cd0907184ce3f02817229a394c175060744e414007",
+    "multipage-unseen.pdf": "3ac378b9bf3914aa5ed2fd3451ff9b64f26d3e039260401473edaa7c9ba8bf95",
+    "custom-form-unseen.pdf": "5796c18c9f637bd34f146e88f9ac199dff8d0add955adb7e4693bbac73b27928"
+  }
+}
