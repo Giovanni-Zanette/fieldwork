@@ -20,7 +20,16 @@ The v1 build supports **Apple Silicon Macs running macOS 13 or later**. Intel Ma
 
 To update an existing installation, quit Fieldwork, replace only the app in Applications, then reopen it. Documents, templates and settings remain in the separate Application Support workspace. Version 1.0.3 includes the Invoice starter, a clearer installer and approval guidance that distinguishes missing data from reviewable exceptions. It does not change the database format or alter existing templates automatically.
 
-This initial distribution is ad-hoc signed and not notarized. If macOS blocks it, verify that the file came from the intended source and that its SHA256 matches the supplied checksum. Use macOS's per-app **Privacy & Security → Open Anyway** option if available and you trust that build. Do not disable Gatekeeper globally. Local acceptance on the build Mac does not establish downloaded-app acceptance on every Mac.
+### If Apple cannot verify the app
+
+This release is ad-hoc signed: it is **not signed with an Apple Developer ID and is not notarized by Apple**. A downloaded copy may therefore show “Apple could not verify Fieldwork is free of malware.” Only continue if you trust this project's official release and have checked the supplied SHA256 checksum.
+
+1. Click **Done** on that warning.
+2. Open **System Settings → Privacy & Security**, then scroll to **Security**.
+3. Find the message about Fieldwork and click **Open Anyway**.
+4. Authenticate if asked, then confirm **Open** in the next prompt.
+
+This creates an exception for Fieldwork only; future launches normally open directly. The option appears after an attempted launch and may be unavailable on a managed Mac. Do not disable Gatekeeper globally or run commands that remove security protections. If the message instead says the app will damage your computer or is damaged, stop and investigate rather than treating it as this first-open warning. See [Apple's official instructions](https://support.apple.com/102445).
 
 ## The working flow
 
