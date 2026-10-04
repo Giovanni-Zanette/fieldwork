@@ -4,6 +4,7 @@ from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1];QA=ROOT/'qa';FIX=ROOT/'tests'/'fixtures'
 EXE=ROOT/'release/Fieldwork.app/Contents/Resources/backend/fieldwork-server'
 OCR=ROOT/'release/Fieldwork.app/Contents/Resources/fieldwork-ocr'
+QA.mkdir(parents=True,exist_ok=True)
 REPORT={'started':time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime()),'cases':[]}
 
 def check(name,condition,detail=None):
